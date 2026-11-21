@@ -1,0 +1,919 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Cargo & Dispatch // Delivery Manager</title>
+<style>
+  :root {
+    --bg: #0b0614; --grid: rgba(168, 85, 247, 0.08); --card: rgba(22, 13, 41, 0.92);
+    --text: #f3e8ff; --muted: #fbbf24; --sub: #c4b5fd;
+    --border: rgba(168, 85, 247, 0.45); --glow: 0 0 16px rgba(251, 191, 36, 0.22);
+    --accent: #fbbf24; --accent2: #a855f7; --btxt: #0b0614;
+  }
+  body.light {
+    --bg: #faf5ff; --grid: rgba(126, 34, 206, 0.07); --card: rgba(255, 255, 255, 0.95);
+    --text: #1e1b4b; --muted: #b45309; --sub: #5b21b6;
+    --border: rgba(126, 34, 206, 0.35); --glow: 0 4px 14px rgba(126, 34, 206, 0.15);
+    --accent: #d97706; --accent2: #7e22ce; --btxt: #ffffff;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Segoe UI', system-ui, sans-serif; }
+    body {
+    background-color: var(--bg);
+    background-image: linear-gradient(var(--grid) 1px, transparent 1px), linear-gradient(90deg, var(--grid) 1px, transparent 1px);
+    background-size: 32px 32px; color: var(--text);
+    width: 100%; max-width: 100%; min-height: 100vh;
+    padding: 20px clamp(16px, 2.5vw, 36px); transition: .2s;
+  }
+
+  .mono { 
+    font-family: ui-monospace, 'Cascadia Code', Consolas, monospace; 
+    letter-spacing: .05em; }
+  header, .top-btns, .nav-tabs, .filters, .card-top, .card-foot, .tags { 
+    display: flex; 
+    align-items: center; 
+    gap: 8px; 
+    flex-wrap: wrap; }
+  header { 
+    justify-content: space-between; 
+    margin-bottom: 18px; 
+    padding-bottom: 14px; 
+    border-bottom: 1px solid var(--border); }
+  input, select, button { 
+    font: inherit; 
+    color: inherit; 
+    border-radius: 8px; 
+    border: 1px solid var(--border); 
+    background: var(--card); }
+  .btn { 
+    padding: 8px 13px; 
+    cursor: pointer; 
+    font-size: .85rem; 
+    font-weight: 600; 
+    text-decoration: none; 
+    display: inline-flex; 
+    align-items: center; }
+  .btn:hover { 
+    border-color: var(--accent); 
+    box-shadow: var(--glow); }
+  .primary { 
+    background: var(--accent); 
+    color: var(--btxt); border: none; }
+  .nav-tabs { 
+    margin-bottom: 18px; }
+  .nav-tab { 
+    padding: 9px 15px; 
+    cursor: pointer; 
+    font-weight: 700; 
+    font-size: .82rem; 
+    text-transform: uppercase; }
+  .nav-tab.active { 
+    background: var(--accent2); 
+    color: #fff; 
+    border-color: var(--accent2); }
+  .stats { 
+    display: grid; 
+    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); 
+    gap: 12px; 
+    margin-bottom: 18px; }
+  .stat-box { 
+    background: var(--card); 
+    border: 1px solid var(--border); 
+    border-radius: 10px; 
+    padding: 14px; }
+  .stat-box span { 
+    font-size: .78rem; 
+    color: var(--sub); 
+    display: block; 
+    margin-bottom: 4px; 
+    text-transform: uppercase; }
+  .stat-box b { 
+    font-size: 1.5rem; }
+  .panel { 
+    background: var(--card); 
+    border: 1px solid var(--border); 
+    border-radius: 12px; 
+    padding: 16px; 
+    margin-bottom: 18px; }
+  .form-grid { 
+    display: grid; 
+    grid-template-columns: repeat(auto-fit, minmax(185px, 1fr)); 
+    gap: 10px; 
+    margin-bottom: 12px; }
+  .form-grid input, .form-grid select { 
+    padding: 9px 12px; 
+    width: 100%; 
+    outline: none; }
+  .toolbar { 
+    display: flex; 
+    justify-content: space-between; 
+    align-items: center; 
+    gap: 10px; 
+    flex-wrap: wrap; 
+    margin-bottom: 16px; }
+  .search { 
+    padding: 8px 12px; 
+    width: 210px; 
+    max-width: 100%; }
+  .tab { 
+    padding: 6px 12px; 
+    border-radius: 20px; 
+    font-size: .82rem; 
+    cursor: pointer; 
+    background: var(--card); 
+    border: 1px solid var(--border); }
+  .tab.active { 
+    background: var(--accent); 
+    color: var(--btxt); 
+    border-color: var(--accent); 
+    font-weight: 700; }
+    .grid { display: grid; 
+      grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); 
+      gap: 16px; 
+      width: 100%; }
+  .card { 
+    background: var(--card); border: 1px solid var(--border); 
+    border-radius: 12px; 
+    padding: 15px; 
+    display: flex; 
+    flex-direction: column; 
+    justify-content: space-between; 
+    gap: 12px; 
+    border-left: 5px solid var(--accent2); }
+  .card.pending { 
+    border-left-color: #fbbf24; }
+  .card.transit { 
+    border-left-color: #38bdf8; }
+  .card.delivered { 
+    border-left-color: #10b981; 
+    opacity: .88; }
+  .badge { 
+    font-size: .72rem; 
+    font-weight: 700; 
+    padding: 3px 8px; 
+    border-radius: 12px; 
+    text-transform: uppercase; }
+  .b-pending { 
+    background: rgba(251,191,36,.18); 
+    color: #fbbf24; }
+  .b-transit { 
+    background: rgba(56,189,248,.18); 
+    color: #38bdf8; }
+  .b-delivered { 
+    background: rgba(16,185,129,.18); 
+    color: #10b981; }
+  .b-urgent { 
+    background: rgba(239,68,68,.2); 
+    color: #f87171; }
+  .b-area { 
+    background: rgba(168,85,247,.22); 
+    color: #d8b4fe; }
+  .meta { 
+    font-size: .88rem; 
+    color: var(--sub); 
+    line-height: 1.5; }
+  .meta b { 
+    color: var(--text); 
+    font-weight: 600; }
+  .card-foot { 
+    justify-content: space-between; 
+    border-top: 1px solid var(--border); 
+    padding-top: 10px; 
+    font-size: .78rem; 
+    color: var(--sub); }
+  .sm-btn { 
+    padding: 5px 8px; 
+    font-size: .76rem; 
+    border-radius: 6px; 
+    cursor: pointer; 
+    font-weight: 600; }
+  .del-btn { 
+    border: none; 
+    background: none; 
+    color: var(--sub); 
+    cursor: pointer; 
+    font-size: .76rem; }
+  .del-btn:hover { 
+    color: #f87171; 
+    text-decoration: underline; }
+    .area-group { 
+      margin-bottom: 24px; }
+  .area-head {
+    display: flex; 
+    align-items: center; 
+    justify-content: space-between;
+    padding: 9px 14px; 
+    border-radius: 10px; 
+    margin-bottom: 12px;
+    background: var(--card); 
+    border: 1px solid var(--border); 
+    border-left: 6px solid var(--zone-col, var(--accent2));
+  }
+  .area-head h3 { font-size: .95rem; text-transform: uppercase; letter-spacing: .06em; color: var(--zone-col, var(--muted)); }
+  .area-pill { font-size: .75rem; font-weight: 700; padding: 3px 10px; border-radius: 12px; background: rgba(255,255,255,.08); }
+  .card.zone-card { border-left-color: var(--zone-col, var(--accent2)); }
+
+  #printArea { display: none; }
+  @media print {
+    body { background: #fff !important; color: #000 !important; padding: 0; }
+    .no-print { display: none !important; }
+    #printArea { display: block !important; width: 100%; max-width: 760px; margin: 0 auto; padding: 22px; border: 2px solid #000; font-family: Arial, sans-serif; }
+    .slip-head { display: flex; justify-content: space-between; border-bottom: 2px solid #000; padding-bottom: 12px; margin-bottom: 16px; }
+    .slip-box { border: 1px solid #000; padding: 12px; margin-bottom: 14px; }
+    .slip-row { margin-bottom: 6px; font-size: 14px; }
+    .sig-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; margin-top: 32px; }
+    .sig-line { border-top: 1px solid #000; padding-top: 6px; font-size: 13px; }
+    table.man-tbl { width: 100%; border-collapse: collapse; margin-top: 10px; font-size: 12px; }
+    table.man-tbl th, table.man-tbl td { border: 1px solid #000; padding: 7px; text-align: left; }
+  }
+</style>
+</head>
+<body>
+<datalist id="areaPresets">
+  <option value="Nelspruit">
+  <option value="Mbombela">
+  <option value="White River">
+  <option value="Hazyview">
+  <option value="Barberton">
+  <option value="Sabie">
+  <option value="Malelane">
+</datalist>
+
+<div class="no-print">
+  <header>
+    <div>
+      <h1 class="mono" id="hdrCompany" style="color:var(--muted)">CARGO &amp; DISPATCH</h1>
+      <div style="font-size:.82rem;color:var(--sub)">Deliveries, Customer Directory, Driver Manifests &amp; Multi-PC Sync</div>
+    </div>
+    <div class="top-btns">
+      <a href="index.html" class="btn mono">&larr; Deck</a>
+      <button id="csvBtn" class="btn mono">Export CSV</button>
+      <button id="themeBtn" class="btn mono">Light HUD</button>
+    </div>
+  </header>
+
+    <div class="nav-tabs">
+    <button class="nav-tab active mono" data-view="ordersView">Active Deliveries</button>
+    <button class="nav-tab mono" data-view="doneView">Completed (<span id="doneCount">0</span>)</button>
+    <button class="nav-tab mono" data-view="custView">Customers (<span id="custCount">0</span>)</button>
+    <button class="nav-tab mono" data-view="drvView">Drivers (<span id="drvCount">0</span>)</button>
+    <button class="nav-tab mono" data-view="setView">Company &amp; Sync</button>
+  </div>
+
+
+  <!-- VIEW 1: DELIVERIES -->
+  <div id="ordersView" class="view-sec">
+    <div class="stats">
+      <div class="stat-box"><span>Total Orders</span><b id="stAll">0</b></div>
+      <div class="stat-box"><span>Pending</span><b id="stPen" style="color:#fbbf24">0</b></div>
+      <div class="stat-box"><span>Out for Delivery</span><b id="stTra" style="color:#38bdf8">0</b></div>
+      <div class="stat-box"><span>Delivered</span><b id="stDel" style="color:#10b981">0</b></div>
+    </div>
+
+    <div class="panel" id="orderFormPanel">
+      <div class="form-grid">
+        <select id="custSelect">
+          <option value="">-- Select Saved Customer (or type below) --</option>
+        </select>
+        <input type="text" id="custIn" placeholder="Company / Customer Name *">
+        <input type="text" id="areaIn" list="areaPresets" placeholder="Delivery Area (e.g., Nelspruit, White River) *">
+        <input type="text" id="addrIn" placeholder="Street / Delivery Address *">
+        <input type="text" id="phoneIn" placeholder="Contact / Phone">
+        <input type="text" id="itemIn" placeholder="Package / Items (e.g., 3x Boxes)">
+        <select id="drvSelect">
+          <option value="">-- Assign Driver (Optional) --</option>
+        </select>
+        <select id="prioIn">
+          <option value="Normal">Normal Priority</option>
+          <option value="Urgent">Urgent / Express</option>
+        </select>
+      </div>
+      <div style="display:flex;justify-content:flex-end;gap:8px">
+        <button id="cancelEditBtn" class="btn mono" style="display:none">Cancel Edit</button>
+        <button id="addBtn" class="btn primary mono">+ Dispatch Order</button>
+      </div>
+    </div>
+
+    <div class="toolbar">
+            <div class="filters" id="filterTabs">
+        <button class="tab active" data-f="all">All Active</button>
+        <button class="tab" data-f="pending">Pending</button>
+        <button class="tab" data-f="transit">Out for Delivery</button>
+      </div>
+
+      <div style="display:flex;gap:8px;flex-wrap:wrap">
+        <select id="areaFilter" style="padding:7px 10px;font-size:.85rem">
+          <option value="all">All Areas</option>
+        </select>
+        <select id="drvFilter" style="padding:7px 10px;font-size:.85rem">
+          <option value="all">All Drivers</option>
+        </select>
+        <input type="text" id="searchIn" class="search" placeholder="Search orders...">
+      </div>
+    </div>
+
+    <div class="grid" id="grid"></div>
+  </div>
+  <!-- VIEW 1B: COMPLETED DELIVERIES ARCHIVE -->
+  <div id="doneView" class="view-sec" style="display:none">
+    <div class="toolbar">
+      <h3 class="mono" style="color:var(--muted)">// COMPLETED DELIVERIES ARCHIVE</h3>
+      <div style="display:flex;gap:8px;flex-wrap:wrap">
+        <select id="doneAreaFilter" style="padding:7px 10px;font-size:.85rem">
+          <option value="all">All Areas</option>
+        </select>
+        <select id="doneDrvFilter" style="padding:7px 10px;font-size:.85rem">
+          <option value="all">All Drivers</option>
+        </select>
+        <input type="text" id="doneSearchIn" class="search" placeholder="Search completed...">
+      </div>
+    </div>
+    <div id="doneGrid"></div>
+  </div>
+
+  <!-- VIEW 2: CUSTOMER DIRECTORY -->
+  <div id="custView" class="view-sec" style="display:none">
+    <div class="panel">
+      <h3 class="mono" style="margin-bottom:12px;color:var(--muted)">ADD SAVED CUSTOMER</h3>
+      <div class="form-grid">
+        <input type="text" id="newCustName" placeholder="Company / Customer Name *">
+        <input type="text" id="newCustArea" list="areaPresets" placeholder="Delivery Area (e.g., Nelspruit) *">
+        <input type="text" id="newCustAddr" placeholder="Street / Delivery Address *">
+        <input type="text" id="newCustPhone" placeholder="Contact Person / Phone *">
+        <input type="text" id="newCustNote" placeholder="Gate code / Notes (optional)">
+      </div>
+      <div style="display:flex;justify-content:flex-end">
+                <button id="cancelCustEditBtn" class="btn mono" style="display:none">Cancel</button>
+        <button id="saveCustBtn" class="btn primary mono">+ Save Customer</button>
+
+      </div>
+    </div>
+    <div class="grid" id="custGrid"></div>
+  </div>
+
+  <!-- VIEW 3: DRIVER ROSTER -->
+  <div id="drvView" class="view-sec" style="display:none">
+    <div class="panel">
+      <h3 class="mono" style="margin-bottom:12px;color:var(--muted)">ADD DRIVER TO ROSTER</h3>
+      <div class="form-grid">
+        <input type="text" id="newDrvName" placeholder="Driver Full Name *">
+        <input type="text" id="newDrvPhone" placeholder="Driver Phone / Radio ID">
+        <input type="text" id="newDrvVeh" placeholder="Vehicle / Plate (e.g., Van #4)">
+      </div>
+      <div style="display:flex;justify-content:flex-end">
+        <button id="saveDrvBtn" class="btn primary mono">+ Add Driver</button>
+      </div>
+    </div>
+    <div class="grid" id="drvGrid"></div>
+  </div>
+
+  <!-- VIEW 4: COMPANY SETTINGS & MULTI-PC SYNC -->
+  <div id="setView" class="view-sec" style="display:none">
+    <div class="panel">
+      <h3 class="mono" style="margin-bottom:12px;color:var(--muted)">YOUR COMPANY DETAILS (PRINTED ON DELIVERY SLIPS)</h3>
+      <div class="form-grid">
+        <input type="text" id="compNameIn" placeholder="Your Company Name (e.g., Lowveld Express Logistics)">
+        <input type="text" id="compPhoneIn" placeholder="Company Phone / Email">
+        <input type="text" id="compAddrIn" placeholder="Depot / Branch Address (e.g., Nelspruit)">
+      </div>
+      <div style="display:flex;justify-content:flex-end">
+        <button id="saveCompBtn" class="btn primary mono">Save Company Info</button>
+      </div>
+    </div>
+
+    <div class="panel">
+      <h3 class="mono" style="margin-bottom:8px;color:var(--muted)">MULTI-PC DATA SYNC &amp; BACKUP</h3>
+      <p style="font-size:.88rem;color:var(--sub);margin-bottom:14px">
+        Export a backup file to your shared Google Drive, OneDrive, or network folder to load your customers, drivers, and deliveries on another PC.
+      </p>
+      <div style="display:flex;gap:10px;flex-wrap:wrap">
+        <button id="exportJsonBtn" class="btn primary mono">Export Backup (.json)</button>
+        <button id="importJsonBtn" class="btn mono">Import Backup (.json)</button>
+        <input type="file" id="importJsonFile" accept=".json" style="display:none">
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- PRINTABLE SLIP / MANIFEST AREA -->
+<div id="printArea"></div>
+<script>
+  const $ = id => document.getElementById(id);
+  const esc = s => String(s || '').replace(/[&<>"']/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
+
+  let theme = localStorage.getItem('dm_theme') || 'dark';
+  function setTheme(t) {
+    theme = t; localStorage.setItem('dm_theme', t);
+    document.body.classList.toggle('light', t === 'light');
+    $('themeBtn').textContent = t === 'light' ? 'Dark HUD' : 'Light HUD';
+  }
+  $('themeBtn').onclick = () => setTheme(theme === 'light' ? 'dark' : 'light');
+  setTheme(theme);
+
+  let orders = JSON.parse(localStorage.getItem('dm_orders') || '[]');
+  let customers = JSON.parse(localStorage.getItem('dm_customers') || '[]');
+  let drivers = JSON.parse(localStorage.getItem('dm_drivers') || '[]');
+  let company = JSON.parse(localStorage.getItem('dm_company') || '{"name":"CARGO & DISPATCH","phone":"","addr":"Mbombela / Nelspruit"}');
+  let filter = 'all', editOrderId = null, editCustId = null;
+
+  const saveAll = () => {
+    localStorage.setItem('dm_orders', JSON.stringify(orders));
+    localStorage.setItem('dm_customers', JSON.stringify(customers));
+    localStorage.setItem('dm_drivers', JSON.stringify(drivers));
+    localStorage.setItem('dm_company', JSON.stringify(company));
+  };
+
+  function syncCompanyUI() {
+    $('hdrCompany').textContent = company.name || 'CARGO & DISPATCH';
+    $('compNameIn').value = company.name || '';
+    $('compPhoneIn').value = company.phone || '';
+    $('compAddrIn').value = company.addr || '';
+  }
+
+  $('saveCompBtn').onclick = () => {
+    company = {
+      name: $('compNameIn').value.trim() || 'CARGO & DISPATCH',
+      phone: $('compPhoneIn').value.trim(),
+      addr: $('compAddrIn').value.trim()
+    };
+    saveAll(); syncCompanyUI(); alert('Company details saved for delivery slips!');
+  };
+
+  document.querySelectorAll('.nav-tab').forEach(tab => {
+    tab.onclick = () => {
+      document.querySelectorAll('.nav-tab').forEach(t => t.classList.remove('active'));
+      tab.classList.add('active');
+      document.querySelectorAll('.view-sec').forEach(sec => sec.style.display = 'none');
+      $(tab.dataset.view).style.display = 'block';
+    };
+  });
+
+  function syncDropdowns() {
+    $('custCount').textContent = customers.length;
+    $('drvCount').textContent = drivers.length;
+    if ($('doneCount')) $('doneCount').textContent = orders.filter(o => o.status === 'delivered').length;
+
+    $('custSelect').innerHTML = '<option value="">-- Select Saved Customer (or type below) --</option>' +
+      customers.map(c => `<option value="${c.id}">${esc(c.name)} [${esc(c.area || 'No Area')}]</option>`).join('');
+
+    $('drvSelect').innerHTML = '<option value="">-- Assign Driver (Optional) --</option>' +
+      drivers.map(d => `<option value="${esc(d.name)}">${esc(d.name)}${d.veh ? ' • ' + esc(d.veh) : ''}</option>`).join('');
+
+    const curDrv = $('drvFilter').value;
+    $('drvFilter').innerHTML = '<option value="all">All Drivers</option>' +
+      drivers.map(d => `<option value="${esc(d.name)}">${esc(d.name)}</option>`).join('');
+    $('drvFilter').value = curDrv || 'all';
+
+    const activeOrders = orders.filter(o => o.status !== 'delivered');
+    const curArea = $('areaFilter').value;
+    const areas = [...new Set(activeOrders.map(o => o.area).filter(Boolean))].sort();
+    $('areaFilter').innerHTML = '<option value="all">All Areas</option>' +
+      areas.map(a => `<option value="${esc(a)}">${esc(a)}</option>`).join('');
+    $('areaFilter').value = areas.includes(curArea) ? curArea : 'all';
+
+    if ($('doneDrvFilter')) {
+      const curDoneDrv = $('doneDrvFilter').value;
+      $('doneDrvFilter').innerHTML = '<option value="all">All Drivers</option>' +
+        drivers.map(d => `<option value="${esc(d.name)}">${esc(d.name)}</option>`).join('');
+      $('doneDrvFilter').value = curDoneDrv || 'all';
+    }
+
+    if ($('doneAreaFilter')) {
+      const curDoneArea = $('doneAreaFilter').value;
+      const doneAreas = [...new Set(orders.filter(o => o.status === 'delivered').map(o => o.area).filter(Boolean))].sort();
+      $('doneAreaFilter').innerHTML = '<option value="all">All Areas</option>' +
+        doneAreas.map(a => `<option value="${esc(a)}">${esc(a)}</option>`).join('');
+      $('doneAreaFilter').value = doneAreas.includes(curDoneArea) ? curDoneArea : 'all';
+    }
+  }
+
+  $('custSelect').onchange = () => {
+    const c = customers.find(x => x.id === Number($('custSelect').value));
+    if (c) {
+      $('custIn').value = c.name;
+      $('areaIn').value = c.area || '';
+      $('addrIn').value = c.addr;
+      $('phoneIn').value = c.phone || '';
+    }
+  };
+
+  function clearCustForm() {
+    editCustId = null;
+    $('newCustName').value = ''; $('newCustArea').value = '';
+    $('newCustAddr').value = ''; $('newCustPhone').value = ''; $('newCustNote').value = '';
+    $('saveCustBtn').textContent = '+ Save Customer';
+    if ($('cancelCustEditBtn')) $('cancelCustEditBtn').style.display = 'none';
+  }
+  if ($('cancelCustEditBtn')) $('cancelCustEditBtn').onclick = clearCustForm;
+
+  window.editCust = id => {
+    const c = customers.find(x => x.id === id);
+    if (!c) return;
+    editCustId = id;
+    $('newCustName').value = c.name || '';
+    $('newCustArea').value = c.area || '';
+    $('newCustAddr').value = c.addr || '';
+    $('newCustPhone').value = c.phone || '';
+    $('newCustNote').value = c.note || '';
+    $('saveCustBtn').textContent = 'Save Changes';
+    if ($('cancelCustEditBtn')) $('cancelCustEditBtn').style.display = 'inline-flex';
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
+  $('saveCustBtn').onclick = () => {
+    const name = $('newCustName').value.trim(), area = $('newCustArea').value.trim(), addr = $('newCustAddr').value.trim();
+    const phone = $('newCustPhone').value.trim(), note = $('newCustNote').value.trim();
+    if (!name || !addr) { alert('Please enter Company/Customer Name and Address.'); return; }
+    if (editCustId) {
+      const idx = customers.findIndex(c => c.id === editCustId);
+      if (idx > -1) customers[idx] = { ...customers[idx], name, area, addr, phone, note };
+    } else {
+      customers.unshift({ id: Date.now(), name, area, addr, phone, note });
+    }
+    clearCustForm(); saveAll(); renderAll();
+  };
+  window.delCust = id => { if (editCustId === id) clearCustForm(); customers = customers.filter(c => c.id !== id); saveAll(); renderAll(); };
+
+  $('saveDrvBtn').onclick = () => {
+    const name = $('newDrvName').value.trim();
+    if (!name) { alert('Please enter Driver Name.'); return; }
+    drivers.unshift({ id: Date.now(), name, phone: $('newDrvPhone').value.trim(), veh: $('newDrvVeh').value.trim() });
+    $('newDrvName').value = ''; $('newDrvPhone').value = ''; $('newDrvVeh').value = '';
+    saveAll(); renderAll();
+  };
+  window.delDrv = id => { drivers = drivers.filter(d => d.id !== id); saveAll(); renderAll(); };
+
+  function clearOrderForm() {
+    editOrderId = null;
+    $('custSelect').value = ''; $('custIn').value = ''; $('areaIn').value = ''; $('addrIn').value = '';
+    $('phoneIn').value = ''; $('itemIn').value = ''; $('drvSelect').value = ''; $('prioIn').value = 'Normal';
+    $('addBtn').textContent = '+ Dispatch Order';
+    $('cancelEditBtn').style.display = 'none';
+  }
+  $('cancelEditBtn').onclick = clearOrderForm;
+
+  window.editOrder = id => {
+    const o = orders.find(x => x.id === id); if (!o) return;
+    editOrderId = id;
+    $('custIn').value = o.cust;
+    $('areaIn').value = o.area || '';
+    $('addrIn').value = o.addr;
+    $('phoneIn').value = o.phone || '';
+    $('itemIn').value = o.items || '';
+    $('drvSelect').value = o.drv || '';
+    $('prioIn').value = o.prio || 'Normal';
+    $('addBtn').textContent = 'Save Changes';
+    $('cancelEditBtn').style.display = 'inline-flex';
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
+  $('addBtn').onclick = () => {
+    const cust = $('custIn').value.trim(), area = $('areaIn').value.trim(), addr = $('addrIn').value.trim();
+    if (!cust || !addr) { alert('Please enter Customer Name and Delivery Address.'); return; }
+    if (editOrderId) {
+      const idx = orders.findIndex(o => o.id === editOrderId);
+      if (idx > -1) {
+        orders[idx] = {
+          ...orders[idx], cust, area: area || 'General', addr,
+          phone: $('phoneIn').value.trim(), items: $('itemIn').value.trim(),
+          drv: $('drvSelect').value, prio: $('prioIn').value
+        };
+      }
+    } else {
+      const code = String(Math.floor(1000 + Math.random() * 9000));
+      const time = new Date().toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' }) +
+                   ' • ' + new Date().toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' });
+      orders.unshift({
+        id: Date.now(), code, cust, area: area || 'General', addr,
+        phone: $('phoneIn').value.trim(), items: $('itemIn').value.trim(),
+        drv: $('drvSelect').value, prio: $('prioIn').value, status: 'pending', time
+      });
+    }
+    clearOrderForm(); saveAll(); renderAll();
+  };
+  document.querySelectorAll('.tab').forEach(btn => {
+    btn.onclick = () => {
+      document.querySelectorAll('.tab').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active'); filter = btn.dataset.f; renderOrders();
+    };
+  });
+
+  window.setStatus = (id, st) => {
+    const o = orders.find(x => x.id === id);
+    if (o) {
+      o.status = st;
+      if (st === 'delivered') {
+        o.doneAt = new Date().toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' }) +
+                   ' • ' + new Date().toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' });
+      }
+      saveAll(); renderAll();
+    }
+  };
+
+  window.delOrder = id => { if (editOrderId === id) clearOrderForm(); orders = orders.filter(x => x.id !== id); saveAll(); renderAll(); };
+
+  window.printSlip = id => {
+    const o = orders.find(x => x.id === id); if (!o) return;
+    $('printArea').innerHTML = `
+      <div class="slip-head">
+        <div>
+          <h2 style="margin-bottom:4px">${esc(company.name)}</h2>
+          <div style="font-size:13px">${esc(company.addr)} ${company.phone ? '• ' + esc(company.phone) : ''}</div>
+        </div>
+        <div style="text-align:right">
+          <strong style="font-size:16px">DELIVERY SLIP #${esc(o.code)}</strong>
+          <div style="font-size:12px;margin-top:4px">${esc(o.time)}</div>
+        </div>
+      </div>
+      <div class="slip-box">
+        <div class="slip-row"><strong>Deliver To:</strong> ${esc(o.cust)}</div>
+        <div class="slip-row"><strong>Delivery Area:</strong> ${esc(o.area)}</div>
+        <div class="slip-row"><strong>Street Address:</strong> ${esc(o.addr)}</div>
+        <div class="slip-row"><strong>Contact / Phone:</strong> ${esc(o.phone || 'N/A')}</div>
+      </div>
+      <div class="slip-box">
+        <div class="slip-row"><strong>Items / Parcel Details:</strong> ${esc(o.items || 'Standard Parcel')}</div>
+        <div class="slip-row"><strong>Priority:</strong> ${esc(o.prio)}</div>
+        <div class="slip-row"><strong>Assigned Driver:</strong> ${esc(o.drv || 'Unassigned')}</div>
+      </div>
+      <p style="font-size:12px">Received in good order and condition:</p>
+      <div class="sig-grid">
+        <div class="sig-line">Recipient Name &amp; Signature</div>
+        <div class="sig-line">Date &amp; Time Received</div>
+      </div>`;
+    window.print();
+  };
+
+  window.printManifest = drvName => {
+    const runs = orders.filter(o => o.drv === drvName && o.status !== 'delivered');
+    if (!runs.length) { alert('No active deliveries assigned to ' + drvName + '.'); return; }
+    const rowsHtml = runs.map((o, i) => `
+      <tr>
+        <td>${i + 1}</td>
+        <td>#${esc(o.code)}</td>
+        <td><strong>${esc(o.cust)}</strong><br>${esc(o.phone || '')}</td>
+        <td><strong>${esc(o.area)}</strong><br>${esc(o.addr)}</td>
+        <td>${esc(o.items || 'Parcel')} (${esc(o.prio)})</td>
+        <td style="width:90px"></td>
+      </tr>`).join('');
+
+    $('printArea').innerHTML = `
+      <div class="slip-head">
+        <div>
+          <h2>${esc(company.name)}</h2>
+          <div style="font-size:13px">DRIVER ROUTE MANIFEST</div>
+        </div>
+        <div style="text-align:right">
+          <strong>Driver: ${esc(drvName)}</strong>
+          <div style="font-size:12px;margin-top:4px">${new Date().toLocaleDateString()} • ${runs.length} Stops</div>
+        </div>
+      </div>
+      <table class="man-tbl">
+        <thead><tr><th>#</th><th>Order</th><th>Customer</th><th>Area &amp; Address</th><th>Items</th><th>Sign</th></tr></thead>
+        <tbody>${rowsHtml}</tbody>
+      </table>`;
+    window.print();
+  };
+
+  const zoneColors = {
+    'nelspruit': '#fbbf24', 'mbombela': '#fbbf24', 'white river': '#38bdf8',
+    'hazyview': '#10b981', 'barberton': '#f43f5e', 'sabie': '#a855f7', 'malelane': '#fb923c'
+  };
+
+  function getZoneColor(area) {
+    const key = String(area || '').trim().toLowerCase();
+    if (zoneColors[key]) return zoneColors[key];
+    const fallback = ['#2dd4bf', '#818cf8', '#f472b6', '#a3e635'];
+    let hash = 0;
+    for (let i = 0; i < key.length; i++) hash = key.charCodeAt(i) + ((hash << 5) - hash);
+    return fallback[Math.abs(hash) % fallback.length];
+  }
+
+  function renderOrders() {
+    $('stAll').textContent = orders.length;
+    $('stPen').textContent = orders.filter(o => o.status === 'pending').length;
+    $('stTra').textContent = orders.filter(o => o.status === 'transit').length;
+    $('stDel').textContent = orders.filter(o => o.status === 'delivered').length;
+
+    const q = $('searchIn').value.toLowerCase(), dFilt = $('drvFilter').value, aFilt = $('areaFilter').value;
+    const list = orders.filter(o => {
+      if (o.status === 'delivered') return false;
+      if (filter !== 'all' && o.status !== filter) return false;
+      if (dFilt !== 'all' && o.drv !== dFilt) return false;
+      if (aFilt !== 'all' && o.area !== aFilt) return false;
+      return o.cust.toLowerCase().includes(q) || (o.area || '').toLowerCase().includes(q) ||
+             o.addr.toLowerCase().includes(q) || o.drv.toLowerCase().includes(q) ||
+             o.items.toLowerCase().includes(q) || o.code.toLowerCase().includes(q);
+    });
+
+    if (!list.length) {
+      $('grid').style.display = 'block';
+      $('grid').innerHTML = '<p style="color:var(--sub)">No active deliveries match this view.</p>';
+      return;
+    }
+
+    const labels = { pending: 'Pending', transit: 'Out for Delivery' };
+    const nextBtn = {
+      pending: { txt: 'Dispatch', next: 'transit' },
+      transit: { txt: 'Delivered', next: 'delivered' }
+    };
+
+    const groups = {};
+    list.forEach(o => {
+      const zone = (o.area || 'General').trim();
+      if (!groups[zone]) groups[zone] = [];
+      groups[zone].push(o);
+    });
+
+    $('grid').style.display = 'block';
+    $('grid').innerHTML = Object.keys(groups).sort().map(zone => {
+      const zCol = getZoneColor(zone);
+      const cardsHtml = groups[zone].map(o => `
+        <div class="card zone-card ${o.status}" style="--zone-col:${zCol}">
+          <div>
+            <div class="card-top" style="justify-content:space-between;margin-bottom:8px">
+              <strong>#${esc(o.code)} &bull; ${esc(o.cust)}</strong>
+              <div class="tags">
+                <span class="badge" style="background:${zCol}28;color:${zCol};border:1px solid ${zCol}66">${esc(zone)}</span>
+                ${o.prio === 'Urgent' ? '<span class="badge b-urgent">Urgent</span>' : ''}
+                <span class="badge b-${o.status}">${labels[o.status]}</span>
+              </div>
+            </div>
+            <div class="meta">
+              <div>Address: <b>${esc(o.addr)}</b></div>
+              ${o.phone ? `<div>Contact: <b>${esc(o.phone)}</b></div>` : ''}
+              <div>Items: <b>${esc(o.items || 'Standard Parcel')}</b></div>
+              <div>Driver: <b>${esc(o.drv || 'Unassigned')}</b></div>
+            </div>
+          </div>
+          <div class="card-foot">
+            <span>${esc(o.time)}</span>
+            <div style="display:flex;gap:5px;align-items:center;flex-wrap:wrap">
+              <button class="sm-btn" onclick="printSlip(${o.id})">Slip</button>
+              <button class="sm-btn" onclick="editOrder(${o.id})">Edit</button>
+              <button class="sm-btn primary" onclick="setStatus(${o.id}, '${nextBtn[o.status].next}')">${nextBtn[o.status].txt}</button>
+              <button class="del-btn" onclick="delOrder(${o.id})">Del</button>
+            </div>
+          </div>
+        </div>`).join('');
+
+      return `
+        <div class="area-group">
+          <div class="area-head" style="--zone-col:${zCol}">
+            <h3 class="mono">${esc(zone)}</h3>
+            <span class="area-pill mono" style="color:${zCol}">${groups[zone].length} ${groups[zone].length === 1 ? 'Stop' : 'Stops'}</span>
+          </div>
+          <div class="grid">${cardsHtml}</div>
+        </div>`;
+    }).join('');
+  }
+  function renderCompleted() {
+    if (!$('doneGrid')) return;
+    const q = ($('doneSearchIn')?.value || '').toLowerCase();
+    const dFilt = $('doneDrvFilter')?.value || 'all';
+    const aFilt = $('doneAreaFilter')?.value || 'all';
+
+    const list = orders.filter(o => {
+      if (o.status !== 'delivered') return false;
+      if (dFilt !== 'all' && o.drv !== dFilt) return false;
+      if (aFilt !== 'all' && o.area !== aFilt) return false;
+      return o.cust.toLowerCase().includes(q) || (o.area || '').toLowerCase().includes(q) ||
+             o.addr.toLowerCase().includes(q) || o.drv.toLowerCase().includes(q) ||
+             o.items.toLowerCase().includes(q) || o.code.toLowerCase().includes(q);
+    });
+
+    if (!list.length) {
+      $('doneGrid').innerHTML = '<p style="color:var(--sub)">No completed deliveries found.</p>';
+      return;
+    }
+
+    $('doneGrid').innerHTML = '<div class="grid">' + list.map(o => {
+      const zCol = getZoneColor(o.area || 'General');
+      return `
+        <div class="card zone-card delivered" style="--zone-col:${zCol}">
+          <div>
+            <div class="card-top" style="justify-content:space-between;margin-bottom:8px">
+              <strong>#${esc(o.code)} &bull; ${esc(o.cust)}</strong>
+              <div class="tags">
+                <span class="badge" style="background:${zCol}28;color:${zCol};border:1px solid ${zCol}66">${esc(o.area || 'General')}</span>
+                <span class="badge b-delivered">Delivered</span>
+              </div>
+            </div>
+            <div class="meta">
+              <div>Address: <b>${esc(o.addr)}</b></div>
+              ${o.phone ? `<div>Contact: <b>${esc(o.phone)}</b></div>` : ''}
+              <div>Items: <b>${esc(o.items || 'Standard Parcel')}</b></div>
+              <div>Driver: <b>${esc(o.drv || 'Unassigned')}</b></div>
+              ${o.doneAt ? `<div>Completed: <b>${esc(o.doneAt)}</b></div>` : ''}
+            </div>
+          </div>
+          <div class="card-foot">
+            <span>Created: ${esc(o.time)}</span>
+            <div style="display:flex;gap:5px;align-items:center">
+              <button class="sm-btn" onclick="printSlip(${o.id})">Slip</button>
+              <button class="sm-btn primary" onclick="setStatus(${o.id}, 'pending')">Reopen</button>
+              <button class="del-btn" onclick="delOrder(${o.id})">Del</button>
+            </div>
+          </div>
+        </div>`;
+    }).join('') + '</div>';
+  }
+
+  function renderDirectories() {
+    $('custGrid').innerHTML = customers.length ? customers.map(c => `
+      <div class="card">
+        <div>
+          <div class="card-top" style="justify-content:space-between">
+            <strong style="font-size:1.05rem">${esc(c.name)}</strong>
+            <span class="badge b-area">${esc(c.area || 'General')}</span>
+          </div>
+          <div class="meta" style="margin-top:8px">
+            <div>Address: <b>${esc(c.addr)}</b></div>
+            ${c.phone ? `<div>Contact: <b>${esc(c.phone)}</b></div>` : ''}
+            ${c.note ? `<div>Notes: <b>${esc(c.note)}</b></div>` : ''}
+          </div>
+        </div>
+        <div class="card-foot">
+          <span>Saved Client</span>
+          <div style="display:flex;gap:8px;align-items:center">
+            <button class="sm-btn" onclick="editCust(${c.id})">Edit</button>
+            <button class="del-btn" onclick="delCust(${c.id})">Remove</button>
+          </div>
+        </div>
+      </div>`).join('') : '<p style="color:var(--sub)">No saved customers yet. Add your regular clients above!</p>';
+
+    $('drvGrid').innerHTML = drivers.length ? drivers.map(d => {
+      const activeRuns = orders.filter(o => o.drv === d.name && o.status !== 'delivered').length;
+      return `
+      <div class="card">
+        <div>
+          <strong style="font-size:1.05rem">${esc(d.name)}</strong>
+          <div class="meta" style="margin-top:8px">
+            ${d.phone ? `<div>Contact: <b>${esc(d.phone)}</b></div>` : ''}
+            ${d.veh ? `<div>Vehicle: <b>${esc(d.veh)}</b></div>` : ''}
+            <div>Active Deliveries: <b>${activeRuns}</b></div>
+          </div>
+        </div>
+        <div class="card-foot">
+          <span>Active Courier</span>
+          <div style="display:flex;gap:8px;align-items:center">
+            <button class="sm-btn" onclick="printManifest('${esc(d.name)}')">Print Manifest</button>
+            <button class="del-btn" onclick="delDrv(${d.id})">Remove</button>
+          </div>
+        </div>
+      </div>`;
+    }).join('') : '<p style="color:var(--sub)">No drivers added yet. Add your team above!</p>';
+  }
+
+  function renderAll() { syncCompanyUI(); syncDropdowns(); renderOrders(); renderCompleted(); renderDirectories(); }
+
+  $('csvBtn').onclick = () => {
+    if (!orders.length) return;
+    const rows = [['Order ID', 'Customer', 'Area', 'Address', 'Contact', 'Items', 'Driver', 'Priority', 'Status', 'Created', 'Completed']];
+    orders.forEach(o => rows.push([o.code, o.cust, o.area, o.addr, o.phone, o.items, o.drv, o.prio, o.status, o.time, o.doneAt || '']));
+    const csv = rows.map(r => r.map(v => `"${String(v || '').replace(/"/g, '""')}"`).join(',')).join('\n');
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(new Blob([csv], { type: 'text/csv' }));
+    a.download = 'deliveries-report.csv'; a.click();
+  };
+
+  $('exportJsonBtn').onclick = () => {
+    const backup = { exportedAt: new Date().toISOString(), company, customers, drivers, orders };
+    const blob = new Blob([JSON.stringify(backup, null, 2)], { type: 'application/json' });
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = `dispatch-backup-${new Date().toISOString().slice(0, 10)}.json`;
+    a.click();
+  };
+
+  $('importJsonBtn').onclick = () => $('importJsonFile').click();
+  $('importJsonFile').onchange = e => {
+    const file = e.target.files[0]; if (!file) return;
+    const reader = new FileReader();
+    reader.onload = ev => {
+      try {
+        const data = JSON.parse(ev.target.result);
+        if (!Array.isArray(data.orders) && !Array.isArray(data.customers)) { alert('Invalid backup file.'); return; }
+        if (data.company) company = data.company;
+        if (Array.isArray(data.customers)) customers = data.customers;
+        if (Array.isArray(data.drivers)) drivers = data.drivers;
+        if (Array.isArray(data.orders)) orders = data.orders;
+        saveAll(); renderAll();
+        alert('Backup restored! All customers, drivers, and deliveries are now loaded.');
+      } catch { alert('Could not read backup file.'); }
+      e.target.value = '';
+    };
+    reader.readAsText(file);
+  };
+
+  $('searchIn').oninput = renderOrders;
+  $('drvFilter').onchange = renderOrders;
+  $('areaFilter').onchange = renderOrders;
+  if ($('doneSearchIn')) $('doneSearchIn').oninput = renderCompleted;
+  if ($('doneDrvFilter')) $('doneDrvFilter').onchange = renderCompleted;
+  if ($('doneAreaFilter')) $('doneAreaFilter').onchange = renderCompleted;
+  renderAll();
+</script>
+</body>
+</html>
+
